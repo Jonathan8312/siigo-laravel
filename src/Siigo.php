@@ -9,6 +9,7 @@ use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Resources\Catalogs;
 use Jonathan8312\Siigo\Resources\Customers;
+use Jonathan8312\Siigo\Resources\Invoices;
 use Jonathan8312\Siigo\Resources\Products;
 use SensitiveParameter;
 
@@ -60,6 +61,15 @@ final class Siigo
     public function products(): Products
     {
         return new Products($this->client);
+    }
+
+    /**
+     * Sales invoices: create, list, find, update, delete, annul, and
+     * the DIAN/PDF/XML/email endpoints. See docs/invoices.md.
+     */
+    public function invoices(): Invoices
+    {
+        return new Invoices($this->client);
     }
 
     /**
