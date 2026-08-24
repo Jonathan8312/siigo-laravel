@@ -62,6 +62,9 @@ $taxes = $siigo->catalogs()->taxes();
 $customer = $siigo->customers()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 $product = $siigo->products()->find('497f6eca-6276-4993-bfeb-53cbbbba6f08');
 $invoice = $siigo->invoices()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
+
+// Creating many invoices? See docs/invoices.md — createBatch() covers Siigo's
+// real (if under-documented) batch endpoint, POST /v1/invoices/batch.
 ```
 
 Remaining business resource methods (`$siigo->creditNotes()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.

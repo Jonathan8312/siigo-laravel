@@ -145,6 +145,32 @@ creation because it replaces the data"). No se probó exhaustivamente qué pasa 
 omitidos que sí tenían valor previo (ej. dejar `contacts` fuera de un update) — tratar
 `CustomerData` siempre como el estado completo deseado, nunca como un parche parcial.
 
+## Invoices
+
+### `POST /v1/invoices/batch` existe, pero no está en `developers.siigo.com`
+La investigación inicial de este SDK concluyó (incorrectamente) que Siigo no tenía un
+endpoint de creación masiva de facturas, basada solo en `developers.siigo.com` — el sitio de
+documentación nuevo (fumadocs), donde efectivamente no aparece. El usuario del proyecto
+confirmó que sí existe y lo usa en producción, y se verificó contra dos fuentes independientes:
+
+1. `siigoapi.docs.apiary.io/#reference/facturas-de-venta/crear-lote-de-facturas-de-venta` —
+   el sitio de documentación **paralelo** de Siigo (basado en Apiary), donde el endpoint sí
+   está documentado, incluyendo una nota de que es una funcionalidad nueva.
+2. Uso real en producción en un proyecto del usuario (`pixie-admin`), que coincide
+   exactamente con lo documentado en Apiary.
+
+**Lección**: Siigo mantiene (al menos temporalmente) dos sitios de documentación no
+sincronizados entre sí. Cuando `developers.siigo.com` no confirme algo, revisar también
+`siigoapi.docs.apiary.io` antes de descartarlo como no oficial o inexistente — ver
+`docs/research/siigo-api-co/04-invoices.md` para el detalle completo del endpoint.
+
+### `invoices[].idempotency_key` del batch — inconsistencia de 30 vs 32 caracteres
+Dentro de la misma página de Apiary, la tabla de campos del endpoint de lote dice máximo 30
+caracteres para `idempotency_key`, pero un mensaje de error genérico documentado en otra
+sección de la misma doc dice "máximo 32 caracteres" para el concepto de idempotencia en
+general. El SDK valida contra 30 (el límite documentado específicamente para el campo, y el
+mismo confirmado empíricamente para el header `Idempotency-Key` de la request singular).
+
 ## Paginación
 
 ### `page_size` del query param no siempre se refleja en la respuesta

@@ -317,22 +317,106 @@ Respuesta (200):
 { "status": "string", "observations": "string" }
 ```
 
-## ¿Facturación por lotes ("batch")?
+## POST /v1/invoices/batch — Crear lote de facturas de venta
 
-**Confirmado que NO existe** un endpoint nativo de creación masiva/batch de facturas en la
-documentación oficial (sidebar completo de "Facturas de Venta" inspeccionado, 11 páginas,
-ninguna es de batch — ver arriba). Una búsqueda web encontró una operación
-`siigo_create_invoice_batch` mencionada en un MCP server de terceros no oficial
-(`github.com/jdlar1/siigo-mcp`), pero eso es un wrapper de conveniencia de ese proyecto (muy
-probablemente iterando sobre `POST /v1/invoices` una factura a la vez), no una funcionalidad
-real de la API de Siigo. **El SDK no debe fabricar un método "batch" que no existe en la
-API** — la forma correcta de crear muchas facturas es invocar `create()` repetidamente,
-usando `Idempotency-Key` (soportado en este endpoint) para que reintentos ante fallos de red
-no dupliquen facturas, y respetando el rate limit documentado (100/min producción, 10/min
-prueba). Ver `docs/invoices.md` para la guía de uso recomendada.
+**Corrección sobre la primera pasada de esta investigación**: sí existe, y es reciente —
+Siigo lo anuncia como "Nuevo endpoint de creación de Facturas de Venta en lote" en su sección
+de Novedades. No aparece en el sitio nuevo `developers.siigo.com` (fumadocs, el que se navegó
+originalmente), pero **sí está documentado oficialmente** en el sitio Apiary paralelo
+(`siigoapi.docs.apiary.io/#reference/facturas-de-venta/crear-lote-de-facturas-de-venta`) — el
+mismo dominio que ya se había usado como fuente secundaria en la Fase 0 para otros recursos.
+Confirmado además contra uso real en producción en el proyecto `pixie-admin` del usuario,
+donde coincide exactamente con lo documentado en Apiary.
+
+- `POST https://api.siigo.com/v1/invoices/batch`
+- Headers: `Authorization`, `Partner-Id`, `Content-Type: application/json`. **No usa el
+  header `Idempotency-Key`** de la request singular — la idempotencia va como campo dentro de
+  cada factura del array (ver abajo).
+- El request body no puede superar **1MB**.
+- Es **asíncrono**: la respuesta HTTP inmediata es solo un acuse de recibo; el resultado real
+  de cada factura llega después vía webhook.
+
+### Body
+
+| Campo | Tipo | Oblig. | Notas |
+|---|---|---|---|
+| `notification_url` | string | Sí | URL a notificar cuando termine de procesarse el lote. Debe iniciar con `https://`, máx. 2048 caracteres. |
+| `invoices` | array | Sí | Cada elemento tiene el mismo shape que `POST /v1/invoices` individual (ver arriba), más un campo adicional `idempotency_key` (string, alfanumérico, sin caracteres especiales, sin espacios — la tabla de campos dice máx. 30 caracteres, pero un mensaje de error en la misma doc dice "máximo 32 caracteres"; inconsistencia menor de la propia doc de Apiary, ver `docs/known-issues.md`). |
+
+### Respuesta inmediata (ACK)
+
+Confirmado por el uso real en `pixie-admin`: `{ "id": "...", "status": "Received", "received_at": "..." }`
+— solo confirma que Siigo recibió el lote, no que las facturas ya existen.
+
+### Notificación webhook (a `notification_url`, cuando termina el procesamiento)
+
+```json
+{
+  "id": "ea6186c4-a11f-4694-90a4-c01b9785e9d2",
+  "status": "Processed",
+  "status_at": "2025-07-10T20:49:01.727Z",
+  "notification_url": "https://webhook.site",
+  "invoices": [
+    {
+      "status_code": "201",
+      "idempotency_key": "1032492954",
+      "id": "166baecf-ae5c-402e-9c7a-1ce6a9c57b1d",
+      "document": { "id": 138531 },
+      "prefix": "FT",
+      "number": 7751,
+      "name": "FV-890-7751",
+      "date": "2025-07-10",
+      "customer": { "id": "13a8cce1-b386-431c-9f8c-8b61b9683fa2", "identification": "103068522", "branch_office": 0 },
+      "seller": 35260,
+      "public_url": "https://documentview.siigo.com"
+    },
+    {
+      "status_code": "400",
+      "idempotency_key": "1032492955",
+      "error": {
+        "status": 400,
+        "errors": [
+          { "code": "invalid_total_payments", "message": "The total payments must be equal to the total invoice. The total invoice calculated is 10000", "params": ["payments"], "detail": "Check the API documentation: ..." }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Cada entrada de `invoices[]` trae su propio `idempotency_key` para que el consumidor la
+relacione con la factura original que envió. `status_code: "201"` indica éxito (con el objeto
+factura completo, mismo shape resumido que la respuesta singular, más `public_url`); cualquier
+otro código trae un objeto `error` con la misma estructura de `Errors[]` del resto de la API
+(en `snake_case` aquí, a diferencia del PascalCase de las respuestas de error síncronas — ver
+`docs/known-issues.md`).
+
+### Nota sobre el sitio de documentación
+
+Que este endpoint no aparezca en `developers.siigo.com` pero sí en `siigoapi.docs.apiary.io`
+sugiere que Siigo mantiene (al menos temporalmente) dos fuentes de documentación no
+sincronizadas entre sí. Para investigación de recursos futuros, conviene revisar **ambos**
+sitios, no solo `developers.siigo.com`.
+
+## Corrección de una conclusión anterior
+
+Una primera pasada de esta investigación (basada solo en `developers.siigo.com`, sin revisar
+Apiary) concluyó erróneamente que no existía ningún endpoint de batch, y que la mención de
+`siigo_create_invoice_batch` en un MCP server de terceros (`github.com/jdlar1/siigo-mcp`) era
+probablemente un wrapper inventado por ese proyecto. Con la evidencia de Apiary y de uso real
+en producción (`pixie-admin`) confirmando `POST /v1/invoices/batch`, lo más probable es que
+esa mención del MCP de terceros fuera correcta desde el principio — simplemente no se pudo
+verificar contra la fuente oficial en ese momento porque no se había revisado Apiary. Lección
+para investigación futura: cuando `developers.siigo.com` no confirme algo, revisar también
+`siigoapi.docs.apiary.io` antes de descartarlo como no oficial.
 
 ## Ambigüedades / pendientes de confirmar
 
+- **`invoices[].idempotency_key` del batch — 30 vs 32 caracteres**: la tabla de campos del
+  endpoint de lote dice máximo 30 caracteres (igual que el `Idempotency-Key` de la request
+  singular, confirmado empíricamente en `docs/known-issues.md`); un mensaje de error genérico
+  en otra parte de la misma doc de Apiary dice "máximo 32 caracteres". El SDK valida contra 30
+  (el límite documentado específicamente para el campo) hasta confirmar lo contrario.
 - El campo `cude` visible en el modelo `stamp` de la respuesta de listado normalmente
   corresponde a notas crédito/débito (CUDE) más que a facturas (CUFE) — no está claro si
   Siigo simplemente reutiliza el mismo sub-modelo `stamp` para todos los documentos
