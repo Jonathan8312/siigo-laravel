@@ -12,6 +12,7 @@ use Illuminate\Http\Client\Request;
 use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Auth\CacheTokenRepository;
+use Jonathan8312\Siigo\DataTransferObjects\Invoices\BatchInvoiceItem;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\CustomerRef;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\DocumentRef;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceData;
@@ -34,6 +35,58 @@ final class InvoicesTest extends TestCase
         $this->assertSame('abc-123', $invoice->id);
         $http->assertSent(fn (Request $request): bool => $request->method() === 'POST'
             && $request->hasHeader('Idempotency-Key', 'invoice1001'));
+    }
+
+    public function test_create_batch_sends_no_idempotency_key_header(): void
+    {
+        $http = $this->fakeHttp();
+        $http->fake(['https://api.siigo.test/v1/invoices/batch' => $http->response([
+            'id' => 'batch-abc', 'status' => 'Received', 'received_at' => '2025-07-10T20:48:59.863Z',
+        ], 202)]);
+
+        $receipt = $this->invoices($http)->createBatch('https://webhook.site', [
+            new BatchInvoiceItem($this->minimalInvoiceData(), 'order1001'),
+            new BatchInvoiceItem($this->minimalInvoiceData(), 'order1002'),
+        ]);
+
+        $this->assertSame('batch-abc', $receipt->id);
+        $this->assertSame('Received', $receipt->status);
+        $http->assertSent(function (Request $request): bool {
+            $invoices = $request['invoices'] ?? null;
+            $firstInvoice = is_array($invoices) ? ($invoices[0] ?? null) : null;
+
+            return $request->method() === 'POST'
+                && $request->url() === 'https://api.siigo.test/v1/invoices/batch'
+                && ! $request->hasHeader('Idempotency-Key')
+                && ($request['notification_url'] ?? null) === 'https://webhook.site'
+                && is_array($invoices)
+                && count($invoices) === 2
+                && is_array($firstInvoice)
+                && ($firstInvoice['idempotency_key'] ?? null) === 'order1001';
+        });
+    }
+
+    public function test_create_batch_rejects_a_payload_over_one_megabyte(): void
+    {
+        $http = $this->fakeHttp();
+
+        $hugeObservations = str_repeat('a', 1_100_000);
+        $items = [new BatchInvoiceItem(
+            new InvoiceData(
+                document: new DocumentRef(22),
+                date: '2021-10-15',
+                customer: new CustomerRef('13832081'),
+                seller: 629,
+                items: [new InvoiceItem(code: 'Item-1', quantity: 1, price: 10)],
+                payments: [new InvoicePayment(5636, 10)],
+                observations: $hugeObservations,
+            ),
+            'order1001',
+        )];
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->invoices($http)->createBatch('https://webhook.site', $items);
     }
 
     public function test_find_requests_the_given_id(): void
