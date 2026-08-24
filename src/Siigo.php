@@ -8,6 +8,7 @@ use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Resources\Catalogs;
+use Jonathan8312\Siigo\Resources\CreditNotes;
 use Jonathan8312\Siigo\Resources\Customers;
 use Jonathan8312\Siigo\Resources\Invoices;
 use Jonathan8312\Siigo\Resources\Products;
@@ -70,6 +71,15 @@ final class Siigo
     public function invoices(): Invoices
     {
         return new Invoices($this->client);
+    }
+
+    /**
+     * Credit notes: create, list, find, and PDF — no confirmed `PUT`,
+     * `DELETE`, or annul endpoint. See docs/credit-notes.md.
+     */
+    public function creditNotes(): CreditNotes
+    {
+        return new CreditNotes($this->client);
     }
 
     /**

@@ -157,3 +157,36 @@ Path param: `id` (GUID). Respuesta modelada como `CreditNotePdfViewModel` en el 
 - No se pudo determinar el código HTTP/estructura de error específico cuando se intenta
   crear una nota crédito sobre una factura ya anulada o con otra nota crédito total
   existente.
+
+## Actualización tras implementación (2026-08-23)
+
+Investigación adicional directa contra `developers.siigo.com/docs/siigoapi/credit-note/*`
+(sitio fumadocs, navegado con browser) resolvió la mayoría de las ambigüedades de arriba:
+
+- **`reason` (Códigos de Motivo de Rechazo DIAN)**, confirmado con nombre por código en la
+  página "Crear Nota Crédito": `1` Devolución parcial de los bienes y/o no aceptación parcial
+  del servicio, `2` Anulación de factura electrónica, `3` Rebaja o descuento parcial o total,
+  `4` Ajuste de precio, `6` Descuento comercial por pronto pago, `7` Descuento comercial por
+  volumen de ventas. **El código `5` no aparece en absoluto** en esta tabla, y el widget de
+  schema del propio endpoint declara el rango permitido como `1-6` (sin el `7`) —
+  inconsistencia de la propia documentación de Siigo, no nuestra. Ver
+  `docs/known-issues.md`.
+- **Shape de `invoice_data` confirmado**: `{date (obligatorio), prefix (opcional), number
+  (obligatorio solo si reason=2), cufe (obligatorio solo si reason=2, máx. 200 caracteres)}`.
+  Debe enviarse junto con `customer.identification`, `customer.branch_office` (opcional,
+  default `0`) y `seller` a nivel raíz del payload — confirmado con un ejemplo de request
+  completo en la documentación.
+- **No existe anulación/eliminación**: confirmado también por la navegación de
+  `developers.siigo.com`, que solo lista Crear, Consultar Tipos (= `GET /v1/document-types?
+  type=NC`, mismo endpoint que catálogos), Consultar, Listar, y PDF — cinco operaciones, sin
+  update/delete/annul.
+- **Campos nuevos no cubiertos en la investigación original**: soporte para ítems de
+  obsequio/regalo (`items[].tax_base`, `items[].taxpayer`, requeridos cuando `price: 0`), y
+  el objeto `healthcare_company` (sector salud, Resolución 948), con el mismo shape que en
+  facturas de venta.
+- **`GET /v1/credit-notes/{id}/pdf` responde `{id, cude, base64}`** — usa `cude`, no `cufe`
+  (a diferencia del PDF de facturas). El objeto `stamp` de la respuesta completa de creación/
+  consulta, sin embargo, sí declara ambos campos (`cufe` y `cude`) simultáneamente.
+
+Ver `docs/credit-notes.md` para la implementación final y `docs/known-issues.md` para el
+detalle de cada inconsistencia encontrada en la documentación de Siigo.

@@ -200,6 +200,68 @@ sección de la misma doc dice "máximo 32 caracteres" para el concepto de idempo
 general. El SDK valida contra 30 (el límite documentado específicamente para el campo, y el
 mismo confirmado empíricamente para el header `Idempotency-Key` de la request singular).
 
+## Credit Notes
+
+### El catálogo de `reason` (motivo DIAN) es internamente inconsistente en la propia página
+Confirmado en `developers.siigo.com/docs/siigoapi/credit-note/1-create-credit-note/`
+(2026-08-23): la tabla legible "Códigos de Motivo de Rechazo DIAN" en el cuerpo de la página
+lista los códigos `1, 2, 3, 4, 6, 7` (**salta el `5`**), mientras que el widget de schema del
+mismo request (generado a partir del OpenAPI de Siigo) declara el rango permitido como
+`1 | 2 | 3 | 4 | 5 | 6` (**sin el `7`**). Ninguna de las dos fuentes es consistente con la otra,
+y no se encontró una tercera fuente (SDK oficial JS, Apiary) que resolviera la ambigüedad — el
+SDK JS solo expone `DianReason` como un enum de enteros sin nombres semánticos.
+
+**Cómo lo maneja el SDK**: `Enums\CreditNoteReason` solo incluye los cinco códigos cuyo
+nombre es inequívoco en la tabla (`1`, `2`, `3`, `4`, `6`). `CreditNoteData::$reason` acepta
+`CreditNoteReason|int`, así que un consumidor puede seguir enviando `5` o `7` como entero
+crudo si su cuenta los necesita — el SDK no los bloquea, solo no les da nombre.
+
+### La descripción documentada del campo `invoice` no corresponde a lo que el campo hace
+En la misma página, la tabla "Campos del JSON" describe el campo `invoice` como "Código del
+tipo de nota crédito" — una descripción que en realidad corresponde a `document.id`. El campo
+`invoice` real es el GUID de la factura que la nota crédito ajusta/anula (confirmado por el
+ejemplo de request/response completo más abajo en la misma página, y por el shape de
+`invoice_data` documentado como su alternativa). Aparente error de copiar/pegar en la
+documentación de Siigo.
+
+**Cómo lo maneja el SDK**: `CreditNoteData::$invoice` se documenta y tipa según el
+comportamiento real (GUID de factura), no según la descripción textual incorrecta.
+
+### `reason` se documenta como opcional para notas no electrónicas, pero el schema lo marca `Required` sin condición
+La misma tabla dice "Obligatorio para documentos electrónicos" para `reason`, pero el widget
+de schema del request lo marca `Required` sin ninguna condición. No se pudo confirmar contra
+sandbox si Siigo realmente rechaza una nota crédito no electrónica sin `reason` — ver
+`CreditNotesStagingTest`, que siempre envía `reason` para evitar el riesgo.
+
+**Cómo lo maneja el SDK**: `CreditNoteData::$reason` es un parámetro obligatorio del
+constructor (sin valor por defecto), siguiendo la declaración más estricta (el schema) en vez
+de la más permisiva (el texto).
+
+### El PDF de una nota crédito usa `cude`, no `cufe`
+Confirmado en `GET /v1/credit-notes/{id}/pdf`: la respuesta es `{id, cude, base64}` — a
+diferencia de `GET /v1/invoices/{id}/pdf`, que devuelve `cufe`. Consistente con que CUDE
+("Código Único de Documento Electrónico") es el identificador usado para notas crédito/débito,
+mientras que CUFE ("Código Único de Factura Electrónica") es específico de facturas de venta.
+El objeto `stamp` de la respuesta completa de una nota crédito, sin embargo, sí documenta
+ambos campos (`cufe` y `cude`) simultáneamente — no confirmado si Siigo realmente popula
+`cufe` ahí o siempre lo deja vacío.
+
+**Cómo lo maneja el SDK**: `CreditNoteFile` usa `cude` (no `cufe`), a diferencia de
+`Invoices\InvoiceFile`. `CreditNoteStamp` mantiene ambos campos, igual que `Invoices\Stamp`.
+
+### No existe `PUT`, `DELETE`, ni anulación para notas crédito
+Confirmado por triple fuente: el SDK oficial JS (`CreditNoteApi` solo expone
+create/list/find/pdf), la navegación de `developers.siigo.com` (mismas cuatro operaciones más
+el catálogo de tipos, que ya cubre `Catalogs::documentTypes('NC')`), y la ausencia de cualquier
+mención a edición/borrado en el cuerpo de la documentación. Una nota crédito creada contra
+sandbox durante el desarrollo de este módulo (`CreditNotesStagingTest`) queda permanente en la
+cuenta — y, una vez creada, la factura que referencia tampoco se puede borrar (ver la sección
+de Invoices arriba: "relacionados... deben borrarse primero").
+
+**Cómo lo maneja el SDK**: `Resources\CreditNotes` no expone `update()`, `delete()`, ni
+`annul()`. `CreditNotesStagingTest` documenta explícitamente esta limitación y acepta dejar
+datos de prueba permanentes en el sandbox como consecuencia.
+
 ## Paginación
 
 ### `page_size` del query param no siempre se refleja en la respuesta

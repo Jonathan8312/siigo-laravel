@@ -19,7 +19,7 @@ A community Laravel SDK for the public [Siigo API](https://developers.siigo.com/
 
 ## Status
 
-This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, **Products**, and **Invoices** (all full CRUD, plus DIAN/PDF/XML/email for invoices). Remaining business resources (Credit Notes, Purchases, ...) are implemented phase by phase.
+This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, **Products**, **Invoices** (full CRUD, plus DIAN/PDF/XML/email), and **Credit Notes** (create, list, find, PDF — no `PUT`/`DELETE` exists for this resource). Remaining business resources (Purchases, ...) are implemented phase by phase.
 
 ## Requirements
 
@@ -62,6 +62,7 @@ $taxes = $siigo->catalogs()->taxes();
 $customer = $siigo->customers()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 $product = $siigo->products()->find('497f6eca-6276-4993-bfeb-53cbbbba6f08');
 $invoice = $siigo->invoices()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
+$creditNote = $siigo->creditNotes()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 
 // Creating many invoices? See docs/invoices.md — createBatch() covers Siigo's
 // real (if under-documented) batch endpoint, POST /v1/invoices/batch.
@@ -78,6 +79,7 @@ Remaining business resource methods (`$siigo->creditNotes()`, ...) are added as 
 - [Customers](docs/customers.md)
 - [Products](docs/products.md)
 - [Invoices](docs/invoices.md)
+- [Credit Notes](docs/credit-notes.md)
 - [Errors](docs/errors.md)
 - [Testing](docs/testing.md)
 - [Known issues](docs/known-issues.md)
