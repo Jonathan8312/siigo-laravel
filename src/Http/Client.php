@@ -47,6 +47,13 @@ final class Client
      */
     private const RETRYABLE_STATUS_CODES = [502, 503, 504];
 
+    /**
+     * Confirmed empirically against Siigo's real API (see
+     * docs/known-issues.md): a hyphen is rejected, matching the same
+     * strict-alphanumeric behavior already confirmed for Partner-Id.
+     */
+    private const IDEMPOTENCY_KEY_PATTERN = '/^[A-Za-z0-9]{1,30}$/';
+
     public function __construct(
         private readonly HttpFactory $http,
         private readonly AuthenticationManager $auth,
@@ -76,6 +83,13 @@ final class Client
      */
     public function post(string $path, array $body = [], ?string $idempotencyKey = null): SiigoResponse
     {
+        if ($idempotencyKey !== null && preg_match(self::IDEMPOTENCY_KEY_PATTERN, $idempotencyKey) !== 1) {
+            throw new \InvalidArgumentException(
+                'An Idempotency-Key must be 1-30 alphanumeric characters, with no spaces, '
+                ."hyphens, or other special characters. Got: \"{$idempotencyKey}\"."
+            );
+        }
+
         return $this->send(
             'POST',
             $path,

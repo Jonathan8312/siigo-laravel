@@ -58,6 +58,30 @@ en vez de dejar que Siigo devuelva `invalid_partner_id`.
 Confirmado: la autenticación funciona sin enviar `Partner-Id`. Solo es obligatorio en los
 requests posteriores a los recursos de la API.
 
+## Header `Idempotency-Key`
+
+### También debe ser estrictamente alfanumérico — mismo patrón que `Partner-Id`
+Confirmado contra sandbox real (2026-08-23) creando una factura: un valor con guiones
+(`siigo-laravel-sdk-staging-123456`) es **rechazado**:
+```json
+{
+  "Status": 400,
+  "Errors": [{
+    "Code": "invalid_idempotency_key",
+    "Message": "The header Idempotency-Key has an invalid value",
+    "Params": [],
+    "Detail": null
+  }]
+}
+```
+La documentación dice "alfanumérico, sin caracteres especiales, sin espacios en blanco" pero,
+igual que con `Partner-Id`, no aclaraba explícitamente que el guion cuenta como carácter
+especial inválido.
+
+**Cómo lo maneja el SDK**: `Http\Client::post()` valida `idempotencyKey` contra
+`^[A-Za-z0-9]{1,30}$` antes de enviarlo, lanzando `InvalidArgumentException` con un mensaje
+claro en vez de dejar que Siigo devuelva `invalid_idempotency_key`.
+
 ## Formato de errores
 
 Confirmado tal cual lo documenta Siigo: claves en PascalCase (`Status`, `Errors`, `Code`,

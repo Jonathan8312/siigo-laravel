@@ -41,9 +41,18 @@ final class ClientTest extends TestCase
         $http = $this->fakeHttp(['https://api.siigo.test/auth' => ['access_token' => 'jwt-value', 'expires_in' => 86400]]);
         $http->fake(['https://api.siigo.test/v1/invoices' => $http->response(['id' => '1'], 201)]);
 
-        $this->client($http)->post('v1/invoices', ['name' => 'FV-1'], idempotencyKey: 'invoice-1');
+        $this->client($http)->post('v1/invoices', ['name' => 'FV-1'], idempotencyKey: 'invoice1');
 
-        $http->assertSent(fn (Request $request): bool => $request->hasHeader('Idempotency-Key', 'invoice-1'));
+        $http->assertSent(fn (Request $request): bool => $request->hasHeader('Idempotency-Key', 'invoice1'));
+    }
+
+    public function test_post_rejects_an_idempotency_key_with_a_hyphen(): void
+    {
+        $http = $this->fakeHttp(['https://api.siigo.test/auth' => ['access_token' => 'jwt-value', 'expires_in' => 86400]]);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->client($http)->post('v1/invoices', [], idempotencyKey: 'invoice-1');
     }
 
     public function test_get_omits_the_idempotency_key_header(): void
