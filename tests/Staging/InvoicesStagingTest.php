@@ -11,6 +11,7 @@ use Illuminate\Http\Client\Factory as HttpFactory;
 use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Auth\CacheTokenRepository;
+use Jonathan8312\Siigo\DataTransferObjects\Catalogs\DocumentType;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\CustomerRef;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\DocumentRef;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceData;
@@ -33,28 +34,40 @@ use Jonathan8312\Siigo\Resources\Products;
  * `stamp.send: true`, so this never actually submits to the real DIAN.
  * Cleanup (delete) is attempted but, like CustomersStagingTest, treated
  * as a documented limitation rather than a failure if Siigo rejects it.
+ *
+ * This sandbox account has 260+ FV document types (evidently a shared
+ * account reused across many unrelated test companies over time), and
+ * a large share of them reject invoice creation with `document_settings`
+ * ("must verify the document settings") — confirmed to be per-document-
+ * type account configuration (DIAN numbering resolution, authorized
+ * sellers, ...), not an SDK defect: the same payload succeeds outright
+ * against a properly-configured type. Rather than depending on any one
+ * document type being usable, this test tries a bounded number of
+ * `NoElectronic` candidates (electronic ones add the DIAN resolution
+ * requirement on top) and treats it as a documented account limitation,
+ * not a failure, only if every candidate is rejected the same way.
  */
 final class InvoicesStagingTest extends StagingTestCase
 {
+    private const MAX_DOCUMENT_TYPE_ATTEMPTS = 5;
+
     public function test_creates_finds_and_deletes_a_real_invoice(): void
     {
         $client = $this->client();
         $catalogs = new Catalogs($client);
 
         $documentTypes = $catalogs->documentTypes('FV');
-        $activeDocumentType = null;
-        foreach ($documentTypes as $documentType) {
-            // A document type with automatic_number: false requires an
-            // explicit `number` the SDK cannot safely guess (it would
-            // need to know the account's next free consecutive) — skip
-            // those and only use one that numbers itself.
-            if ($documentType->active && $documentType->automaticNumber) {
-                $activeDocumentType = $documentType;
-                break;
-            }
-        }
-        if ($activeDocumentType === null) {
-            $this->markTestSkipped('Sandbox account has no active, automatically-numbered FV document type.');
+        $candidates = array_values(array_filter(
+            $documentTypes,
+            // automatic_number: false would require an explicit `number`
+            // the SDK cannot safely guess; electronic_type other than
+            // NoElectronic adds the DIAN resolution requirement above.
+            static fn (DocumentType $documentType): bool => $documentType->active
+                && $documentType->automaticNumber
+                && $documentType->electronicType === 'NoElectronic',
+        ));
+        if ($candidates === []) {
+            $this->markTestSkipped('Sandbox account has no active, automatically-numbered, non-electronic FV document type.');
         }
 
         $paymentTypes = $catalogs->paymentTypes('FV');
@@ -80,27 +93,41 @@ final class InvoicesStagingTest extends StagingTestCase
         $product = $existingProducts->items[0];
 
         $invoices = new Invoices($client);
-        $invoiceData = new InvoiceData(
-            document: new DocumentRef($activeDocumentType->id),
-            date: (new \DateTimeImmutable)->format('Y-m-d'),
-            customer: new CustomerRef($customer->identification, $customer->branchOffice),
-            seller: $sellers->items[0]->id,
-            items: [new InvoiceItem(code: $product->code, quantity: 1, price: 100)],
-            payments: [new InvoicePayment($paymentTypes[0]->id, 100)],
-        );
+        $today = (new \DateTimeImmutable)->format('Y-m-d');
+        $created = null;
+        $lastException = null;
 
-        try {
-            $created = $invoices->create($invoiceData, idempotencyKey: 'siigolaravelsdkstaging'.random_int(100000, 999999));
-        } catch (ValidationException $exception) {
-            if ($exception->errorCode() === 'document_settings') {
-                $this->markTestIncomplete(
-                    "Siigo rejected document type {$activeDocumentType->id} with document_settings ".
-                    '("you must verify the document settings") — likely an account-configuration issue '.
-                    '(e.g. numbering resolution) in Siigo Nube, not an SDK defect. See docs/known-issues.md.'
-                );
+        foreach (array_slice($candidates, 0, self::MAX_DOCUMENT_TYPE_ATTEMPTS) as $documentType) {
+            $invoiceData = new InvoiceData(
+                document: new DocumentRef($documentType->id),
+                date: $today,
+                customer: new CustomerRef($customer->identification, $customer->branchOffice),
+                seller: $sellers->items[0]->id,
+                items: [new InvoiceItem(code: $product->code, quantity: 1, price: 100)],
+                // due_date is required by this sandbox account's payment
+                // configuration even though the docs mark it optional.
+                payments: [new InvoicePayment($paymentTypes[0]->id, 100, $today)],
+            );
+
+            try {
+                $created = $invoices->create($invoiceData, idempotencyKey: 'siigolaravelsdkstaging'.random_int(100000, 999999));
+                break;
+            } catch (ValidationException $exception) {
+                if ($exception->errorCode() !== 'document_settings') {
+                    throw $exception;
+                }
+
+                $lastException = $exception;
             }
+        }
 
-            throw $exception;
+        if ($created === null) {
+            $this->markTestIncomplete(
+                'Every candidate document type in this sandbox account was rejected with '.
+                'document_settings — likely inconsistent per-document-type configuration '.
+                '(DIAN resolution, authorized sellers, ...) across this shared account. Last error: '.
+                $lastException->getMessage().' See docs/known-issues.md.'
+            );
         }
 
         $this->assertNotSame('', $created->id);

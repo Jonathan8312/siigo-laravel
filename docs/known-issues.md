@@ -147,6 +147,35 @@ omitidos que sí tenían valor previo (ej. dejar `contacts` fuera de un update) 
 
 ## Invoices
 
+### `document_settings` en `POST /v1/invoices` casi siempre significa "falta la resolución DIAN"
+Confirmado contra sandbox real (2026-08-23): crear una factura con un `document.id` cuyo tipo
+de comprobante tiene `electronic_type` distinto de `NoElectronic` (es decir, cualquier tipo de
+facturación electrónica) devuelve:
+```json
+{
+  "Status": 400,
+  "Errors": [{
+    "Code": "document_settings",
+    "Message": "The document.id cannot be used, you must verify the document settings",
+    "Params": [],
+    "Detail": null
+  }]
+}
+```
+Se probó con dos tipos de comprobante electrónicos distintos (uno del sector transporte y uno
+estándar) y ambos fallaron igual — descartando que fuera un problema de un tipo de comprobante
+específico. Con un tipo `NoElectronic`, la creación funcionó de punta a punta (factura real
+creada y luego borrada exitosamente). Esto indica que el error es específico de facturación
+electrónica, casi con certeza porque **no hay una resolución de numeración DIAN vigente
+asociada** a esos tipos de comprobante en esta cuenta — es configuración de Siigo Nube
+(**Configuración → Documentos → Facturación electrónica de venta**), no algo resoluble desde
+el SDK ni desde la API.
+
+**Cómo lo maneja el SDK**: nada que hacer del lado del SDK — el error se propaga
+correctamente como `ValidationException` con `errorCode() === 'document_settings'`. El test de
+staging usa deliberadamente un tipo de comprobante `NoElectronic` para no depender de que la
+cuenta tenga una resolución DIAN configurada.
+
 ### `POST /v1/invoices/batch` existe, pero no está en `developers.siigo.com`
 La investigación inicial de este SDK concluyó (incorrectamente) que Siigo no tenía un
 endpoint de creación masiva de facturas, basada solo en `developers.siigo.com` — el sitio de
