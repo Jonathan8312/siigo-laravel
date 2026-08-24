@@ -244,10 +244,17 @@ los parámetros adicionales `type`, `stock_control`, `active`, `date_start`, `da
 { "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb", "deleted": true }
 ```
 
+**Confirmado contra sandbox real (2026-08-23)**: el shape documentado es correcto —
+`DELETE` sobre un producto recién creado (sin movimientos) devolvió `200` con
+`"deleted": true`, y un `GET /{id}` posterior devolvió `404`. A diferencia de
+`DELETE /v1/customers/{id}` (ver `docs/known-issues.md`), este endpoint **sí** funcionó sin
+restricciones en la cuenta usada.
+
 No se documentan restricciones explícitas sobre productos con movimientos (a diferencia de
 `account_group` en actualizar) — no confirmado si Siigo rechaza el `DELETE` de un producto ya
-usado en documentos; probablemente cae en el error genérico `delete_not_allowed` visto en
-`00-core-auth-http.md`, pero no está confirmado específicamente para `products`.
+usado en documentos (el producto probado no tenía movimientos); probablemente cae en el error
+genérico `delete_not_allowed` visto en `00-core-auth-http.md`, pero no está confirmado
+específicamente para `products`.
 
 ---
 
