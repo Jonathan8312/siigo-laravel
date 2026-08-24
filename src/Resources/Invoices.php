@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Jonathan8312\Siigo\Resources;
 
+use Jonathan8312\Siigo\DataTransferObjects\Invoices\BatchInvoiceItem;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\Invoice;
+use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceBatchNotification;
+use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceBatchReceipt;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceData;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\InvoiceFile;
 use Jonathan8312\Siigo\DataTransferObjects\Invoices\MailStatus;
@@ -13,9 +16,8 @@ use Jonathan8312\Siigo\Http\PaginatedResponse;
 
 /**
  * `/v1/invoices` — sales invoices. See docs/research/siigo-api-co/04-invoices.md
- * and docs/invoices.md for the recommended pattern to create many
- * invoices safely (there is no native Siigo "batch" endpoint — see
- * known-issues.md).
+ * and docs/invoices.md, including {@see self::createBatch()} for
+ * creating many invoices in one asynchronous request.
  */
 final class Invoices
 {
@@ -29,6 +31,42 @@ final class Invoices
         $response = $this->client->post('v1/invoices', $invoice->toArray(), $idempotencyKey);
 
         return Invoice::fromArray($this->decode($response->json()));
+    }
+
+    /**
+     * `POST /v1/invoices/batch` — creates many invoices in one
+     * asynchronous request. Siigo acknowledges receipt immediately
+     * (this method's return value); the real per-invoice outcomes
+     * arrive later as a webhook POST to `notificationUrl`, which your
+     * application must implement its own route for — see
+     * {@see InvoiceBatchNotification}
+     * and docs/invoices.md.
+     *
+     * Confirmed via Siigo's Apiary documentation (not present on
+     * developers.siigo.com as of this writing — see known-issues.md).
+     * Unlike {@see self::create()}, idempotency here is a field inside
+     * each {@see BatchInvoiceItem}, not an HTTP header.
+     *
+     * @param  list<BatchInvoiceItem>  $invoices
+     */
+    public function createBatch(string $notificationUrl, array $invoices): InvoiceBatchReceipt
+    {
+        $body = [
+            'notification_url' => $notificationUrl,
+            'invoices' => array_map(static fn (BatchInvoiceItem $item): array => $item->toArray(), $invoices),
+        ];
+
+        // Siigo documents a 1MB request body limit for this endpoint;
+        // fail fast with a clear message rather than a round trip.
+        if (strlen(json_encode($body, JSON_THROW_ON_ERROR)) > 1_000_000) {
+            throw new \InvalidArgumentException(
+                'The invoice batch payload exceeds Siigo\'s documented 1MB request body limit. Split it into smaller batches.'
+            );
+        }
+
+        $response = $this->client->post('v1/invoices/batch', $body);
+
+        return InvoiceBatchReceipt::fromArray($this->decode($response->json()));
     }
 
     public function find(string $id): Invoice
