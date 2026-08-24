@@ -8,6 +8,7 @@ use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Resources\Catalogs;
+use Jonathan8312\Siigo\Resources\Customers;
 use SensitiveParameter;
 
 /**
@@ -42,6 +43,14 @@ final class Siigo
     public function catalogs(): Catalogs
     {
         return new Catalogs($this->client);
+    }
+
+    /**
+     * Customers/third parties: create, list, find, update, and delete.
+     */
+    public function customers(): Customers
+    {
+        return new Customers($this->client);
     }
 
     /**
