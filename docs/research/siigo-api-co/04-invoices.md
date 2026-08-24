@@ -235,50 +235,67 @@ Respuesta: `200` con el objeto factura actualizado completo.
 
 ## DELETE /v1/invoices/{id}
 
-Confirmado por el SDK oficial JS (`InvoiceApi.deleteInvoice`, modelo de respuesta
-`InvoiceDeleteViewModel`). No se pudo verificar contra la doc oficial de
-developers.siigo.com el shape exacto de la respuesta ni las restricciones (ej. si aplican
-las mismas reglas de "debe eliminar documentos relacionados primero" que en `PUT`).
+**Confirmado directamente (página `invoice/6-delete-invoice`)**. Mismas reglas de negocio y
+mismo shape de respuesta que `annul` (arriba): no se puede borrar una factura en proceso de
+envío a la DIAN/aceptada, ni con documentos relacionados sin eliminar primero.
+
+```json
+{ "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb", "deleted": true }
+```
 
 ## POST /v1/invoices/{id}/annul — Anular factura
 
-Confirmado por el SDK oficial JS (`InvoiceApi.annulInvoice`). No se pudo obtener el shape
-del body/respuesta desde developers.siigo.com directamente (página no indexada en las
-búsquedas realizadas). Comportamiento esperado por analogía con otros ERPs: marca la
-factura como `annulled: true` sin eliminarla, preservando el historial (campo `annulled`
-visible en la respuesta de `GET`/list).
+**Confirmado directamente contra `developers.siigo.com` (2026-08-23, sidebar renderizado,
+página `invoice/5-annul-invoice`)**: no requiere body (solo el `id` en el path). Respuesta
+`200`:
 
-## POST /v1/invoices/{id}/stamp — Timbrar factura electrónica
+```json
+{ "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb", "deleted": true }
+```
 
-Confirmado por el SDK oficial JS (`InvoiceApi.sendElectronicInvoice`,
-body `SendElectronicInvoiceCommand`, respuesta `SendElectronicInvoiceViewModel`). Permite
-timbrar ante la DIAN facturas creadas sin `stamp.send: true` inicialmente. Shape exacto del
-body no confirmado contra developers.siigo.com — el único campo confirmado en
-`StampCommand` (usado también en create/update) es `send` (boolean, "Represents the status
-of document").
+Reglas de negocio documentadas explícitamente en esta página: no se puede anular una
+factura en proceso de envío a la DIAN o ya aceptada (con CUFE), ni una factura con
+documentos relacionados (notas crédito/débito, recibos de caja, ajustes de cartera) — esos
+deben eliminarse primero en Siigo Nube.
+
+## No existe un endpoint de "timbrado" (`stamp`) independiente
+
+**Confirmado navegando el sidebar completo y renderizado de la sección "Facturas de Venta"
+(11 páginas exactas, 2026-08-23)**: no hay ninguna página `POST /v1/invoices/{id}/stamp`.
+La suposición previa (Fase 0, basada en el SDK oficial JS) de que existía un endpoint
+separado para timbrar una factura creada sin `stamp.send: true` **no se pudo confirmar
+oficialmente y probablemente no existe como endpoint público documentado** — el único
+mecanismo confirmado para solicitar el timbrado electrónico es el campo `stamp.send` dentro
+de `POST`/`PUT /v1/invoices`. El SDK no implementa un método `stamp()` separado hasta
+confirmar lo contrario.
 
 ## GET /v1/invoices/{id}/stamp/errors — Errores de rechazo DIAN
 
-Confirmado por el SDK oficial JS (`InvoiceApi.getElectronicInvoiceErrors`). Respuesta
-(`EInvoiceErrorsViewModel`):
+**Confirmado directamente (página `invoice/8-get-electronic-invoice-errors`)**. Respuesta:
 
 ```json
 {
   "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb",
-  "errors": [
-    { "...": "shape de EInvoiceErrorViewModel no confirmado en detalle" }
-  ]
+  "errors": [ { "message": "This is an Error" } ]
 }
 ```
 
-`id`: GUID de la factura. `errors`: lista de mensajes de error de la DIAN.
-
 ## GET /v1/invoices/{id}/pdf — PDF de factura
 
-Confirmado por el SDK oficial JS (`InvoiceApi.getInvoicePDF`, respuesta
-`InvoicePdfViewModel`). Referencias de terceros (MCP servers no oficiales) indican que
-devuelve el PDF como string base64, pero **no se confirmó directamente contra la doc
-oficial** — no se pudo cargar la página específica en developers.siigo.com.
+**Confirmado directamente (página `invoice/9-get-invoice-p-d-f`)**. Respuesta:
+
+```json
+{ "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb", "cufe": "123456789012", "base64": "string" }
+```
+
+## GET /v1/invoices/{id}/xml — XML de factura (endpoint no detectado en la Fase 0)
+
+**Nuevo, confirmado directamente (página `invoice/get-invoice-x-m-l`)** — no estaba en el
+listado original de endpoints de la Fase 0. Mismo shape que PDF:
+
+```json
+{ "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb", "cufe": "123456789012", "base64": "string" }
+```
 
 ## POST /v1/invoices/{id}/mail — Enviar factura por correo
 
@@ -300,15 +317,22 @@ Respuesta (200):
 { "status": "string", "observations": "string" }
 ```
 
+## ¿Facturación por lotes ("batch")?
+
+**Confirmado que NO existe** un endpoint nativo de creación masiva/batch de facturas en la
+documentación oficial (sidebar completo de "Facturas de Venta" inspeccionado, 11 páginas,
+ninguna es de batch — ver arriba). Una búsqueda web encontró una operación
+`siigo_create_invoice_batch` mencionada en un MCP server de terceros no oficial
+(`github.com/jdlar1/siigo-mcp`), pero eso es un wrapper de conveniencia de ese proyecto (muy
+probablemente iterando sobre `POST /v1/invoices` una factura a la vez), no una funcionalidad
+real de la API de Siigo. **El SDK no debe fabricar un método "batch" que no existe en la
+API** — la forma correcta de crear muchas facturas es invocar `create()` repetidamente,
+usando `Idempotency-Key` (soportado en este endpoint) para que reintentos ante fallos de red
+no dupliquen facturas, y respetando el rate limit documentado (100/min producción, 10/min
+prueba). Ver `docs/invoices.md` para la guía de uso recomendada.
+
 ## Ambigüedades / pendientes de confirmar
 
-- No se pudo cargar la página oficial de `get-invoice-pdf` en developers.siigo.com (404 en
-  los slugs probados) — el formato exacto de la respuesta del PDF (base64 en JSON vs.
-  binario directo) no está confirmado oficialmente.
-- El body exacto de `POST /v1/invoices/{id}/annul` (¿requiere motivo, fecha?) no se pudo
-  confirmar — solo se confirmó que el endpoint existe.
-- El body exacto de `POST /v1/invoices/{id}/stamp` para re-timbrar una factura creada sin
-  `stamp.send: true` no está confirmado en detalle más allá del campo `send`.
 - El campo `cude` visible en el modelo `stamp` de la respuesta de listado normalmente
   corresponde a notas crédito/débito (CUDE) más que a facturas (CUFE) — no está claro si
   Siigo simplemente reutiliza el mismo sub-modelo `stamp` para todos los documentos
@@ -317,5 +341,5 @@ Respuesta (200):
   `identification`) dentro del payload de `POST /v1/invoices` — la doc dice que el cliente
   "debe existir" pero se detectó una mención ambigua a creación inline sin ejemplo completo.
   Tratar como no soportado hasta confirmar.
-- `DELETE /v1/invoices/{id}` — no se confirmaron las restricciones de negocio (ej. si aplica
-  el mismo `delete_not_allowed` que otros documentos con movimientos asociados).
+- No se confirmó si `Idempotency-Key` también aplica a `PUT /v1/invoices/{id}` (el core
+  research solo confirma `POST` para los 4 endpoints de documentos electrónicos).

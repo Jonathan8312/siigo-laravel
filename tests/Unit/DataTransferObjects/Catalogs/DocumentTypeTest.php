@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Jonathan8312\Siigo\Tests\Unit\DataTransferObjects\Catalogs;
 
 use Jonathan8312\Siigo\DataTransferObjects\Catalogs\DocumentType;
+use Jonathan8312\Siigo\Enums\DiscountType;
 use PHPUnit\Framework\TestCase;
 
 final class DocumentTypeTest extends TestCase
@@ -19,7 +20,7 @@ final class DocumentTypeTest extends TestCase
             'decimals' => true, 'advance_payment' => false, 'reteiva' => false, 'reteica' => false,
             'self_withholding' => false, 'self_withholding_limit' => 0,
             'electronic_type' => 'NoElectronic', 'official_book' => '0', 'document_support' => false,
-            'prefix' => 'FV-1',
+            'prefix' => 'FV-1', 'cargo_transportation' => false, 'customer_by_item' => true,
             'global_discounts' => [['id' => 1, 'name' => 'Discount', 'percentage' => 5, 'active' => true]],
             'global_charges' => [['id' => 2, 'name' => 'Charge', 'percentage' => 3, 'active' => true]],
         ]);
@@ -32,6 +33,9 @@ final class DocumentTypeTest extends TestCase
         $this->assertSame(1235, $documentType->costCenterDefault);
         $this->assertSame(3, $documentType->consecutive);
         $this->assertSame('FV-1', $documentType->prefix);
+        $this->assertSame(DiscountType::Value, $documentType->discountType);
+        $this->assertFalse($documentType->cargoTransportation);
+        $this->assertTrue($documentType->customerByItem);
 
         $this->assertCount(1, $documentType->globalDiscounts);
         $this->assertSame(1, $documentType->globalDiscounts[0]->id);
