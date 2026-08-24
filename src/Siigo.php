@@ -11,6 +11,7 @@ use Jonathan8312\Siigo\Resources\Catalogs;
 use Jonathan8312\Siigo\Resources\CreditNotes;
 use Jonathan8312\Siigo\Resources\Customers;
 use Jonathan8312\Siigo\Resources\Invoices;
+use Jonathan8312\Siigo\Resources\PaymentReceipts;
 use Jonathan8312\Siigo\Resources\Products;
 use SensitiveParameter;
 
@@ -80,6 +81,15 @@ final class Siigo
     public function creditNotes(): CreditNotes
     {
         return new CreditNotes($this->client);
+    }
+
+    /**
+     * Payment receipts to suppliers (recibos de pago/egreso): create,
+     * list, find, update, and delete. See docs/payment-receipts.md.
+     */
+    public function paymentReceipts(): PaymentReceipts
+    {
+        return new PaymentReceipts($this->client);
     }
 
     /**

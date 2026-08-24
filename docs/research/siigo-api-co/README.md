@@ -56,7 +56,10 @@ Antes de implementar cada módulo (Fase 2+), confirmar contra sandbox o soporte 
    de conversión cotización→factura en ninguna fuente revisada.
 5. **Vouchers**: contradicción sin resolver sobre si el tipo `Detailed` sigue vigente (un
    changelog dice que se eliminó, un ejemplo en la misma sección lo sigue usando).
-6. **Payment Receipts**: la doc promete edición pero no hay ningún `PUT` en el spec.
+6. **Payment Receipts**: ~~la doc promete edición pero no hay ningún `PUT` en el spec.~~
+   **Resuelto** (Fase Payment Receipts, 2026-08-24): `PUT` sí existe, confirmado contra
+   sandbox de punta a punta. Además se descubrió que `GET /v1/payment-types?document_type=RP`
+   no existe (404) — usar `document_type=FC`. Ver `docs/known-issues.md`.
 7. **Paginación**: inconsistencia de nombre de clave (`_links` vs `__links`) según la fuente;
    además `page_size` no se reflejó en un test real contra `customers` (ver known-issues.md).
 8. **Reports**: la API pública solo expone 3 reportes — no asumir que existen cuentas por

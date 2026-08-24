@@ -19,7 +19,7 @@ A community Laravel SDK for the public [Siigo API](https://developers.siigo.com/
 
 ## Status
 
-This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, **Products**, **Invoices** (full CRUD, plus DIAN/PDF/XML/email), and **Credit Notes** (create, list, find, PDF — no `PUT`/`DELETE` exists for this resource). Remaining business resources (Purchases, ...) are implemented phase by phase.
+This package is under active, phased development. The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, **Products**, **Invoices** (full CRUD, plus DIAN/PDF/XML/email), **Credit Notes** (create, list, find, PDF — no `PUT`/`DELETE` exists for this resource), and **Payment Receipts** (full CRUD). Remaining business resources (Purchases, Vouchers, Quotations, ...) are implemented phase by phase.
 
 ## Requirements
 
@@ -63,12 +63,13 @@ $customer = $siigo->customers()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 $product = $siigo->products()->find('497f6eca-6276-4993-bfeb-53cbbbba6f08');
 $invoice = $siigo->invoices()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 $creditNote = $siigo->creditNotes()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
+$paymentReceipt = $siigo->paymentReceipts()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 
 // Creating many invoices? See docs/invoices.md — createBatch() covers Siigo's
 // real (if under-documented) batch endpoint, POST /v1/invoices/batch.
 ```
 
-Remaining business resource methods (`$siigo->creditNotes()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
+Remaining business resource methods (`$siigo->purchases()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
 
 ## Documentation
 
@@ -80,6 +81,7 @@ Remaining business resource methods (`$siigo->creditNotes()`, ...) are added as 
 - [Products](docs/products.md)
 - [Invoices](docs/invoices.md)
 - [Credit Notes](docs/credit-notes.md)
+- [Payment Receipts](docs/payment-receipts.md)
 - [Errors](docs/errors.md)
 - [Testing](docs/testing.md)
 - [Known issues](docs/known-issues.md)

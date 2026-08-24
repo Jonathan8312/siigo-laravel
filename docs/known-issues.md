@@ -262,12 +262,76 @@ de Invoices arriba: "relacionados... deben borrarse primero").
 `annul()`. `CreditNotesStagingTest` documenta explícitamente esta limitación y acepta dejar
 datos de prueba permanentes en el sandbox como consecuencia.
 
+## Payment Receipts
+
+### `PUT /v1/payment-receipts/{id}` sí existe, pese a no estar en el spec `.apib`
+`09-payment-receipts.md` dejó como ambigüedad sin resolver si el endpoint de edición
+prometido por el texto de "Novedades" del spec realmente existe, ya que el `Group Recibos de
+pago o egreso` del `.apib` no documenta ningún `PUT`. Confirmado contra sandbox
+(2026-08-24): `PUT /v1/payment-receipts/{id-inexistente}` devuelve `400 parameter_required`
+("The field Document is required"), no un 404/405 de ruteo — es decir, el endpoint existe y
+valida el body antes de resolver el id. Confirmado también de punta a punta contra un recibo
+real (`PaymentReceiptsStagingTest`): crear → `PUT` cambiando `observations` → el `GET`
+posterior refleja el cambio.
+
+**Cómo lo maneja el SDK**: `Resources\PaymentReceipts::update()` existe (a diferencia de
+`CreditNotes`, que no lo expone).
+
+### `GET /v1/payment-types?document_type=RP` no existe — usar `FC`
+El catálogo de tipos de pago documenta `document_type` como obligatorio pero no aclara qué
+valores acepta más allá de los confirmados para otros módulos (`FV`, `FC`, `NC`, `RC` — ver
+`01-catalogs.md`). Confirmado contra sandbox que `RP` **no** es un valor válido: `GET
+/v1/payment-types?document_type=RP` devuelve `404 not_found`. En cambio, `document_type=FC`
+(compra) sí funciona y devuelve las formas de pago del lado proveedor (`type:
+"CarteraProveedor"`/`"Proveedor"`) — confirmado que sus ids coinciden con los `payment.id`
+realmente usados en recibos de pago reales existentes en la cuenta sandbox.
+
+**Cómo lo maneja el SDK**: `DataTransferObjects\PaymentReceipts\Payment` documenta usar
+`Catalogs::paymentTypes('FC')`, no `'RP'`. `PaymentReceiptsStagingTest` lo hace así.
+
+### El campo `payment` puede estar ausente por completo en la respuesta
+A diferencia de lo documentado (`payment.id`/`payment.value` obligatorios en el request),
+varios recibos reales devueltos por `GET /v1/payment-receipts` (listado, 2026-08-24) no traen
+la clave `payment` en absoluto — ocurre en registros con `items: []` también, sugiriendo un
+recibo cuyo pago no terminó de procesarse del lado de Siigo.
+
+**Cómo lo maneja el SDK**: `PaymentReceipt::$payment` es nulable (`?PaymentSummary`), a
+diferencia de `PaymentReceiptData::$payment` (obligatorio en el request).
+
+### La variante avanzada (`type: Detailed`) no se verificó contra sandbox
+El spec documenta un ejemplo completo de request para `Detailed` (movimientos contables
+explícitos por `items[].account`), pero probarlo contra sandbox requeriría códigos de plan de
+cuentas reales de la cuenta de pruebas, que no hay forma de descubrir vía la API (no existe un
+catálogo de cuentas contables entre los 11 catálogos confirmados en `01-catalogs.md`) — y sería
+una escritura contable permanente sin forma segura de validarla primero. `DetailedItem`,
+`DetailedPaymentReceiptData`, `AccountRef` y `TaxRef` están modelados estrictamente según el
+spec, sin verificación empírica. Ver también la ambigüedad ya documentada en
+`09-payment-receipts.md` sobre si `Detailed` sigue vigente para `vouchers` (recurso aún no
+implementado) de la misma forma que para `payment-receipts`.
+
+**Cómo lo maneja el SDK**: el docblock de `DetailedPaymentReceiptData` señala explícitamente
+que no está verificado. Confirmar contra la cuenta real del consumidor antes de depender de
+esta variante en producción.
+
 ## Paginación
 
 ### `page_size` del query param no siempre se refleja en la respuesta
 Al pedir `GET /v1/customers?page=1&page_size=1` o `page_size=2`, la respuesta reportó
 `"pagination": {"page_size": 10, ...}` (el valor por defecto), no el `page_size` solicitado.
-**Pendiente de investigar a fondo en Fase 2/3**: podría deberse a un mínimo de `page_size`
-distinto al esperado, a un nombre de parámetro diferente, o a un comportamiento real del
-recurso `customers` en particular. No asumir que `page_size` funciona igual en todos los
-recursos hasta confirmarlo endpoint por endpoint.
+Reproducido también en `payment-receipts` (2026-08-24): `GET
+/v1/payment-receipts?page=1&page_size=2` devolvió `"pagination": {"page_size": 10, ...}` y 10
+resultados reales, no 2 — confirma que no es un comportamiento específico de `customers`, sino
+un límite mínimo de `page_size` (aparentemente 10) aplicado de forma transversal. No asumir que
+`page_size` funciona igual en todos los recursos hasta confirmarlo endpoint por endpoint.
+
+### El filtro `type` de `GET /v1/customers` no siempre filtra
+Observado de paso durante la investigación de Payment Receipts (2026-08-24, no el foco de esa
+investigación, pendiente de confirmar a fondo si toca el módulo Customers): `GET
+/v1/customers?type=Supplier&active=true` devolvió una mezcla de registros `type: "Supplier"` y
+`type: "Customer"` en `results[]`, en vez de solo proveedores. No se investigó si es un bug
+real o un `page_size`/`page` insuficiente para ver el patrón completo.
+
+**Cómo lo maneja el SDK**: `PaymentReceiptsStagingTest` filtra por `type === Supplier` en
+memoria sobre el resultado de `Customers::all(type: CustomerType::Supplier, ...)`, sin confiar
+en que el filtro del query ya hizo el trabajo — mismo patrón defensivo que
+`CreditNotesStagingTest` usa para tipos de documento.
