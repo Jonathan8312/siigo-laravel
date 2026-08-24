@@ -47,6 +47,13 @@ final class ArrayShapeTest extends TestCase
         $this->assertSame(0.0, ArrayShape::float(['percentage' => 'x'], 'percentage'));
     }
 
+    public function test_nullable_float_returns_null_for_non_numeric_or_missing(): void
+    {
+        $this->assertNull(ArrayShape::nullableFloat(['value' => 'x'], 'value'));
+        $this->assertNull(ArrayShape::nullableFloat([], 'value'));
+        $this->assertSame(19.5, ArrayShape::nullableFloat(['value' => '19.5'], 'value'));
+    }
+
     public function test_bool_only_accepts_real_booleans(): void
     {
         $this->assertTrue(ArrayShape::bool(['active' => true], 'active'));
