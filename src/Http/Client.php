@@ -18,6 +18,7 @@ use Jonathan8312\Siigo\Exceptions\ServerException;
 use Jonathan8312\Siigo\Exceptions\SiigoError;
 use Jonathan8312\Siigo\Exceptions\ValidationException;
 use Jonathan8312\Siigo\Siigo;
+use Jonathan8312\Siigo\Support\IdempotencyKey;
 
 /**
  * The single point of contact between the SDK and Siigo.
@@ -46,13 +47,6 @@ final class Client
      * see {@see RateLimitException}.
      */
     private const RETRYABLE_STATUS_CODES = [502, 503, 504];
-
-    /**
-     * Confirmed empirically against Siigo's real API (see
-     * docs/known-issues.md): a hyphen is rejected, matching the same
-     * strict-alphanumeric behavior already confirmed for Partner-Id.
-     */
-    private const IDEMPOTENCY_KEY_PATTERN = '/^[A-Za-z0-9]{1,30}$/';
 
     public function __construct(
         private readonly HttpFactory $http,
@@ -83,11 +77,8 @@ final class Client
      */
     public function post(string $path, array $body = [], ?string $idempotencyKey = null): SiigoResponse
     {
-        if ($idempotencyKey !== null && preg_match(self::IDEMPOTENCY_KEY_PATTERN, $idempotencyKey) !== 1) {
-            throw new \InvalidArgumentException(
-                'An Idempotency-Key must be 1-30 alphanumeric characters, with no spaces, '
-                ."hyphens, or other special characters. Got: \"{$idempotencyKey}\"."
-            );
+        if ($idempotencyKey !== null) {
+            IdempotencyKey::assertValid($idempotencyKey);
         }
 
         return $this->send(
