@@ -9,6 +9,7 @@ use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Resources\Catalogs;
 use Jonathan8312\Siigo\Resources\Customers;
+use Jonathan8312\Siigo\Resources\Products;
 use SensitiveParameter;
 
 /**
@@ -51,6 +52,14 @@ final class Siigo
     public function customers(): Customers
     {
         return new Customers($this->client);
+    }
+
+    /**
+     * Products/services: create, list, find, update, and delete.
+     */
+    public function products(): Products
+    {
+        return new Products($this->client);
     }
 
     /**
