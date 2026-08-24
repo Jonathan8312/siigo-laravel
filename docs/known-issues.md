@@ -87,6 +87,40 @@ endpoint. En pruebas reales contra sandbox (2026-08-23), omitirlo devuelve:
 (no es nullable/opcional), evitando que el consumidor del SDK dispare una llamada que Siigo
 siempre va a rechazar.
 
+## Customers
+
+### `DELETE /v1/customers/{id}` puede estar deshabilitado por cuenta
+El endpoint existe (confirmado también por el SDK oficial JS de Siigo), pero en pruebas
+reales contra la cuenta sandbox (2026-08-23) fue rechazado con:
+```json
+{
+  "Status": 403,
+  "Errors": [{
+    "Code": "disabled_functionality",
+    "Message": "This functionality is temporarily disabled.",
+    "Params": [],
+    "Detail": null
+  }]
+}
+```
+No está claro si esto es una restricción específica de esta cuenta/momento o una política
+general de Siigo para el endpoint de borrado de clientes — no se encontró documentación
+oficial al respecto. El SDK mapea correctamente este caso a `RequestException` (403, catch-all)
+con `errorCode() === 'disabled_functionality'`.
+
+**Cómo lo maneja el SDK**: `Customers::delete()` se implementa igual (el endpoint es real),
+pero el test de staging correspondiente trata este código de error específico como una
+limitación conocida (`markTestIncomplete`) en vez de una falla del SDK, y no oculta ningún
+otro tipo de error en `delete()`. Un cliente de prueba creado durante ese test quedó sin poder
+borrarse por esta restricción — dato inofensivo, pero queda en la cuenta sandbox.
+
+### `PUT /v1/customers/{id}` confirmado como reemplazo completo
+Confirmado contra sandbox real: enviar un `CustomerData` con un `name` distinto reemplaza
+`name` correctamente, consistente con lo que documenta Siigo ("must send equal fields as in
+creation because it replaces the data"). No se probó exhaustivamente qué pasa con campos
+omitidos que sí tenían valor previo (ej. dejar `contacts` fuera de un update) — tratar
+`CustomerData` siempre como el estado completo deseado, nunca como un parche parcial.
+
 ## Paginación
 
 ### `page_size` del query param no siempre se refleja en la respuesta

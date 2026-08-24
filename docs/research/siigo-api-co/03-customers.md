@@ -168,15 +168,21 @@ no se preservan del estado anterior. Respuesta: `200` con el objeto actualizado,
 ## DELETE /v1/customers/{id}
 
 Confirmado en el SDK oficial JS (`CustomerApi.deleteCustomer`, modelo de respuesta
-`CustomerDeleteViewModel`) pero **no se pudo verificar el shape exacto de la respuesta ni
-código HTTP en `developers.siigo.com`** directamente — no se encontró la página oficial vía
-búsqueda. Tratar como confirmado-parcial: el endpoint existe, pero el contrato de respuesta
-no está confirmado contra la doc oficial.
+`CustomerDeleteViewModel`) pero no se encontró la página oficial en `developers.siigo.com`.
+**Probado contra sandbox real (2026-08-23)**: el endpoint devolvió `403` con
+`Code: "disabled_functionality"` ("This functionality is temporarily disabled.") al intentar
+borrar un cliente recién creado por el propio test. No se confirmó si es una restricción de
+esta cuenta/momento particular o una política general de Siigo — ver `docs/known-issues.md`.
+El shape de una respuesta *exitosa* de este endpoint sigue sin confirmarse.
 
 ## Ambigüedades / pendientes de confirmar
 
 - No se pudo cargar directamente la página oficial `developers.siigo.com/docs/siigoapi/customer/2-get-customers` ni `.../3-get-customer` ni `.../5-delete-customer` (asumiendo esa numeración) — el contenido reportado arriba para list/get-single proviene de fetches exitosos a slugs `2-get-customers` y `3-get-customer` que sí resolvieron, pero no se verificó que esos sean los slugs canónicos actuales (podrían haber cambiado).
-- `DELETE /v1/customers/{id}` — endpoint confirmado por el SDK oficial JS de Siigo, pero sin verificación directa en la doc de developers.siigo.com (no indexado en las búsquedas realizadas). No se confirmó si Siigo permite eliminar clientes con movimientos asociados (facturas, etc.) o si devuelve `409`/`delete_not_allowed` en ese caso — es razonable esperar el mismo patrón de error que otros documentos (`delete_not_allowed`, ver `00-core-auth-http.md`), pero no está confirmado específicamente para clientes.
+- `DELETE /v1/customers/{id}` — confirmado que el endpoint existe y responde, pero en la
+  cuenta sandbox usada devolvió `403 disabled_functionality` en vez de completar el borrado
+  (ver arriba y `docs/known-issues.md`). No se pudo confirmar el shape de una respuesta
+  exitosa, ni si Siigo bloquea el borrado de clientes con movimientos asociados
+  (`delete_not_allowed`) de forma independiente de esta restricción de cuenta.
 - No quedó claro si `Idempotency-Key` aplica a `POST /v1/customers` — la investigación previa (`00-core-auth-http.md`) solo confirmó idempotencia en facturas de venta, notas crédito, journals y vouchers; no se menciona `customers` ni se descartó explícitamente.
 - El campo `check_digit` en la respuesta de creación es idéntico al enviado — no se confirmó si Siigo lo recalcula/valida contra el NIT enviado o simplemente lo persiste tal cual.
 - No se encontró documentación sobre duplicados: la única mención indirecta es que "duplicate identifications are permitted only for new branch offices" — no se confirmó el código de error exacto (`already_exists`, `duplicated_document`?) que se dispara si se intenta crear un cliente con `identification`+`branch_office` ya existentes.

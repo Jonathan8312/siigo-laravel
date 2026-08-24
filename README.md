@@ -19,7 +19,7 @@ A community Laravel SDK for the public [Siigo API](https://developers.siigo.com/
 
 ## Status
 
-This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client) and **Catalogs** (read-only reference data). Business resources (Customers, Products, Invoices, ...) are implemented phase by phase.
+This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), and **Customers** (full CRUD). Remaining business resources (Products, Invoices, ...) are implemented phase by phase.
 
 ## Requirements
 
@@ -59,9 +59,10 @@ $siigo = app(Siigo::class);
 public function __construct(private Siigo $siigo) {}
 
 $taxes = $siigo->catalogs()->taxes();
+$customer = $siigo->customers()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 ```
 
-Business resource methods (`$siigo->customers()`, `$siigo->products()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
+Remaining business resource methods (`$siigo->products()`, `$siigo->invoices()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
 
 ## Documentation
 
@@ -69,6 +70,7 @@ Business resource methods (`$siigo->customers()`, `$siigo->products()`, ...) are
 - [Configuration](docs/configuration.md)
 - [Authentication](docs/authentication.md)
 - [Catalogs](docs/catalogs.md)
+- [Customers](docs/customers.md)
 - [Errors](docs/errors.md)
 - [Testing](docs/testing.md)
 - [Known issues](docs/known-issues.md)
