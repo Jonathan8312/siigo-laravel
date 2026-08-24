@@ -7,6 +7,7 @@ namespace Jonathan8312\Siigo;
 use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Http\Client;
+use Jonathan8312\Siigo\Resources\Catalogs;
 use SensitiveParameter;
 
 /**
@@ -20,8 +21,8 @@ use SensitiveParameter;
  * container singleton safe under Octane and other long-running workers
  * — no per-company state is ever written to shared state.
  *
- * Resource accessors (customers(), products(), invoices(), ...) are
- * added in later phases, once the corresponding Siigo endpoints are
+ * Further resource accessors (customers(), products(), invoices(), ...)
+ * are added in later phases, once the corresponding Siigo endpoints are
  * implemented — see docs/known-issues.md and docs/research/siigo-api-co
  * for what has already been investigated.
  */
@@ -31,6 +32,17 @@ final class Siigo
         private readonly Client $client,
         private readonly AuthenticationManager $auth,
     ) {}
+
+    /**
+     * Siigo's read-only master/reference data (account groups, taxes,
+     * price lists, warehouses, sellers, document types, payment types,
+     * cost centers) — company-agnostic and independent of which company
+     * the current credentials belong to.
+     */
+    public function catalogs(): Catalogs
+    {
+        return new Catalogs($this->client);
+    }
 
     /**
      * Return a new, detached Siigo instance authenticated as a different
