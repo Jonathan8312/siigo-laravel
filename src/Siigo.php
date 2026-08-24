@@ -13,6 +13,7 @@ use Jonathan8312\Siigo\Resources\Customers;
 use Jonathan8312\Siigo\Resources\Invoices;
 use Jonathan8312\Siigo\Resources\PaymentReceipts;
 use Jonathan8312\Siigo\Resources\Products;
+use Jonathan8312\Siigo\Support\CatalogCache;
 use SensitiveParameter;
 
 /**
@@ -36,17 +37,24 @@ final class Siigo
     public function __construct(
         private readonly Client $client,
         private readonly AuthenticationManager $auth,
+        private readonly ?CatalogCache $catalogCache = null,
     ) {}
 
     /**
      * Siigo's read-only master/reference data (account groups, taxes,
      * price lists, warehouses, sellers, document types, payment types,
-     * cost centers) — company-agnostic and independent of which company
-     * the current credentials belong to.
+     * cost centers). Cached per-company (see {@see CatalogCache} and
+     * `SIIGO_CATALOG_CACHE_TTL_SECONDS` in config/siigo.php) — this data
+     * changes rarely, and re-fetching it on every invoice/payment
+     * receipt would burn through Siigo's rate limit fast. This SDK does
+     * not persist it anywhere beyond that cache: matching Siigo's ids to
+     * your own application's master data is your application's
+     * responsibility, not this package's (see README "What it does not
+     * do").
      */
     public function catalogs(): Catalogs
     {
-        return new Catalogs($this->client);
+        return new Catalogs($this->client, $this->catalogCache, fn (): string => $this->auth->credentialsFingerprint());
     }
 
     /**
@@ -106,7 +114,7 @@ final class Siigo
     ): self {
         $auth = $this->auth->withCredentials(new AuthCredentials($username, $accessKey));
 
-        return new self($this->client->withAuthenticationManager($auth), $auth);
+        return new self($this->client->withAuthenticationManager($auth), $auth, $this->catalogCache);
     }
 
     /**

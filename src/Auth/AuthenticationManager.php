@@ -12,6 +12,8 @@ use Jonathan8312\Siigo\Exceptions\ConnectionException;
 use Jonathan8312\Siigo\Exceptions\SiigoError;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Http\ClientConfiguration;
+use Jonathan8312\Siigo\Siigo;
+use Jonathan8312\Siigo\Support\CatalogCache;
 
 /**
  * Obtains, caches, and renews the Siigo JWT.
@@ -119,9 +121,16 @@ final class AuthenticationManager
     }
 
     /**
+     * A stable, non-reversible identifier for the current credentials —
+     * used by {@see self::cacheKey()} for the token cache, and reused by
+     * {@see CatalogCache} so cached catalog
+     * data (taxes, sellers, cost centers, ...) never leaks across
+     * companies in a multi-tenant application that switches credentials
+     * via {@see Siigo::withCredentials()}.
+     *
      * @throws AuthenticationException when no credentials are configured.
      */
-    private function cacheKey(): string
+    public function credentialsFingerprint(): string
     {
         if (! $this->credentials->hasCredentials()) {
             throw new AuthenticationException(
@@ -129,6 +138,11 @@ final class AuthenticationManager
             );
         }
 
-        return self::CACHE_KEY_PREFIX.$this->credentials->fingerprint();
+        return $this->credentials->fingerprint();
+    }
+
+    private function cacheKey(): string
+    {
+        return self::CACHE_KEY_PREFIX.$this->credentialsFingerprint();
     }
 }

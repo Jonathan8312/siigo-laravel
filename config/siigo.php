@@ -102,22 +102,34 @@ return [
 
     /*
     |--------------------------------------------------------------------
-    | Access Token Cache
+    | Cache
     |--------------------------------------------------------------------
     |
     | Siigo's JWT is valid for 24h and there is no refresh endpoint, so
     | the SDK caches it via Laravel's Cache and re-authenticates only
     | once it is close to expiring. "store" defaults to the application's
-    | default cache store; set it explicitly if the token should live in
-    | a specific store. "token_safety_margin_seconds" renews the token
-    | this many seconds before its real expiry, to avoid a request
-    | racing against the token expiring mid-flight.
+    | default cache store; set it explicitly if the token (and the
+    | catalog cache below) should live in a specific store.
+    | "token_safety_margin_seconds" renews the token this many seconds
+    | before its real expiry, to avoid a request racing against the
+    | token expiring mid-flight.
+    |
+    | "catalog_ttl_seconds" caches Catalogs:: results (taxes, sellers,
+    | cost centers, ...) in the same "store" — reference data that
+    | changes rarely, and re-fetching it on every invoice/payment
+    | receipt burns through Siigo's rate limit fast (10 req/min on trial
+    | accounts). Set to 0 to disable catalog caching and always hit the
+    | real API. This SDK never persists this data anywhere beyond that
+    | cache — matching Siigo's ids to your own application's master data
+    | is your application's responsibility, not this package's (see
+    | README "What it does not do").
     |
     */
 
     'cache' => [
         'store' => env('SIIGO_CACHE_STORE'),
         'token_safety_margin_seconds' => env('SIIGO_TOKEN_SAFETY_MARGIN_SECONDS', 60),
+        'catalog_ttl_seconds' => env('SIIGO_CATALOG_CACHE_TTL_SECONDS', 3600),
     ],
 
 ];

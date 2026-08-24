@@ -9,6 +9,8 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Collection;
 use Jonathan8312\Siigo\Auth\AuthCredentials;
 use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Auth\CacheTokenRepository;
@@ -16,6 +18,7 @@ use Jonathan8312\Siigo\DataTransferObjects\Catalogs\User;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Http\ClientConfiguration;
 use Jonathan8312\Siigo\Resources\Catalogs;
+use Jonathan8312\Siigo\Support\CatalogCache;
 use PHPUnit\Framework\TestCase;
 
 final class CatalogsTest extends TestCase
@@ -98,6 +101,42 @@ final class CatalogsTest extends TestCase
         $this->assertSame([], $costCenters);
     }
 
+    public function test_a_second_call_is_served_from_cache_when_a_catalog_cache_is_configured(): void
+    {
+        $http = $this->fakeHttp(['https://api.siigo.test/v1/taxes*' => [
+            ['id' => 13156, 'name' => 'IVA 19%', 'type' => 'IVA', 'percentage' => 19, 'active' => true],
+        ]]);
+        $cache = new CatalogCache(new CacheManager($this->cacheApp()), null, 3600);
+        $catalogs = $this->catalogs($http, $cache, fn (): string => 'company-a');
+
+        $catalogs->taxes();
+        $catalogs->taxes();
+
+        $this->assertCount(1, $this->taxesRequests($http));
+    }
+
+    public function test_different_credential_prefixes_do_not_share_the_cache(): void
+    {
+        $http = $this->fakeHttp(['https://api.siigo.test/v1/taxes*' => [
+            ['id' => 13156, 'name' => 'IVA 19%', 'type' => 'IVA', 'percentage' => 19, 'active' => true],
+        ]]);
+        $cacheManager = new CacheManager($this->cacheApp());
+        $cache = new CatalogCache($cacheManager, null, 3600);
+
+        $this->catalogs($http, $cache, fn (): string => 'company-a')->taxes();
+        $this->catalogs($http, $cache, fn (): string => 'company-b')->taxes();
+
+        $this->assertCount(2, $this->taxesRequests($http));
+    }
+
+    /**
+     * @return Collection<int, array{Request, Response|null}>
+     */
+    private function taxesRequests(HttpFactory $http): Collection
+    {
+        return $http->recorded(fn (Request $request): bool => str_contains($request->url(), 'v1/taxes'));
+    }
+
     /**
      * @param  array<string, array<array-key, mixed>>  $urlToBody
      */
@@ -113,7 +152,7 @@ final class CatalogsTest extends TestCase
         return $http;
     }
 
-    private function catalogs(HttpFactory $http): Catalogs
+    private function catalogs(HttpFactory $http, ?CatalogCache $cache = null, ?\Closure $cacheKeyPrefix = null): Catalogs
     {
         $config = new ClientConfiguration(
             baseUrl: 'https://api.siigo.test',
@@ -122,13 +161,19 @@ final class CatalogsTest extends TestCase
             timeout: 15.0,
         );
 
-        $app = new Application;
-        $app['config'] = new ConfigRepository(['cache' => ['default' => 'array', 'stores' => ['array' => ['driver' => 'array']]]]);
-        $tokens = new CacheTokenRepository(new CacheManager($app));
+        $tokens = new CacheTokenRepository(new CacheManager($this->cacheApp()));
 
         $auth = new AuthenticationManager($http, new AuthCredentials('user@example.com', 'secret-key'), $config, $tokens);
         $client = new Client($http, $auth, $config);
 
-        return new Catalogs($client);
+        return new Catalogs($client, $cache, $cacheKeyPrefix);
+    }
+
+    private function cacheApp(): Application
+    {
+        $app = new Application;
+        $app['config'] = new ConfigRepository(['cache' => ['default' => 'array', 'stores' => ['array' => ['driver' => 'array']]]]);
+
+        return $app;
     }
 }

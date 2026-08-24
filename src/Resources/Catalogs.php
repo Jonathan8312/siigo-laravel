@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Jonathan8312\Siigo\Resources;
 
+use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\DataTransferObjects\Catalogs\AccountGroup;
 use Jonathan8312\Siigo\DataTransferObjects\Catalogs\CostCenter;
 use Jonathan8312\Siigo\DataTransferObjects\Catalogs\DocumentType;
@@ -14,6 +15,7 @@ use Jonathan8312\Siigo\DataTransferObjects\Catalogs\User;
 use Jonathan8312\Siigo\DataTransferObjects\Catalogs\Warehouse;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Http\PaginatedResponse;
+use Jonathan8312\Siigo\Support\CatalogCache;
 
 /**
  * Siigo's read-only master/reference data — the catalogs Customers,
@@ -23,17 +25,32 @@ use Jonathan8312\Siigo\Http\PaginatedResponse;
  * `fixed-assets`, `expenses`, and `misc-incomes` are documented but
  * deliberately not implemented here: they are only relevant to journals
  * and vouchers, not yet implemented (see the project roadmap).
+ *
+ * Every method here is cached through {@see CatalogCache} when resolved
+ * via `$siigo->catalogs()` (see `SIIGO_CATALOG_CACHE_TTL_SECONDS` in
+ * config/siigo.php) — this data changes rarely, and an application
+ * resolving it on every invoice/payment receipt would burn through
+ * Siigo's rate limit fast. `$cache` and `$cacheKeyPrefix` are both
+ * optional and default to no caching, so constructing this class
+ * directly (as the test suite does) keeps working unchanged.
  */
 final class Catalogs
 {
-    public function __construct(private readonly Client $client) {}
+    /**
+     * @param  (\Closure(): string)|null  $cacheKeyPrefix  Lazily resolved so constructing this class never eagerly requires credentials — only an actual cached call does. Typically the current credentials' fingerprint, so cached data never leaks across companies in a multi-tenant app — see {@see AuthenticationManager::credentialsFingerprint()}.
+     */
+    public function __construct(
+        private readonly Client $client,
+        private readonly ?CatalogCache $cache = null,
+        private readonly ?\Closure $cacheKeyPrefix = null,
+    ) {}
 
     /**
      * @return list<AccountGroup>
      */
     public function accountGroups(): array
     {
-        return $this->list('v1/account-groups', AccountGroup::fromArray(...));
+        return $this->remember('account-groups', fn (): array => $this->list('v1/account-groups', AccountGroup::fromArray(...)));
     }
 
     /**
@@ -41,7 +58,7 @@ final class Catalogs
      */
     public function taxes(): array
     {
-        return $this->list('v1/taxes', Tax::fromArray(...));
+        return $this->remember('taxes', fn (): array => $this->list('v1/taxes', Tax::fromArray(...)));
     }
 
     /**
@@ -49,7 +66,7 @@ final class Catalogs
      */
     public function priceLists(): array
     {
-        return $this->list('v1/price-lists', PriceList::fromArray(...));
+        return $this->remember('price-lists', fn (): array => $this->list('v1/price-lists', PriceList::fromArray(...)));
     }
 
     /**
@@ -57,7 +74,7 @@ final class Catalogs
      */
     public function warehouses(): array
     {
-        return $this->list('v1/warehouses', Warehouse::fromArray(...));
+        return $this->remember('warehouses', fn (): array => $this->list('v1/warehouses', Warehouse::fromArray(...)));
     }
 
     /**
@@ -67,9 +84,11 @@ final class Catalogs
      */
     public function users(int $page = 1, int $pageSize = 25): PaginatedResponse
     {
-        $response = $this->client->get('v1/users', ['page' => $page, 'page_size' => $pageSize]);
+        return $this->remember("users:page={$page}:page_size={$pageSize}", function () use ($page, $pageSize): PaginatedResponse {
+            $response = $this->client->get('v1/users', ['page' => $page, 'page_size' => $pageSize]);
 
-        return PaginatedResponse::fromResponse($response, User::fromArray(...));
+            return PaginatedResponse::fromResponse($response, User::fromArray(...));
+        });
     }
 
     /**
@@ -78,7 +97,7 @@ final class Catalogs
      */
     public function documentTypes(string $type): array
     {
-        return $this->list('v1/document-types', DocumentType::fromArray(...), ['type' => $type]);
+        return $this->remember("document-types:type={$type}", fn (): array => $this->list('v1/document-types', DocumentType::fromArray(...), ['type' => $type]));
     }
 
     /**
@@ -87,7 +106,7 @@ final class Catalogs
      */
     public function paymentTypes(string $documentType): array
     {
-        return $this->list('v1/payment-types', PaymentType::fromArray(...), ['document_type' => $documentType]);
+        return $this->remember("payment-types:document_type={$documentType}", fn (): array => $this->list('v1/payment-types', PaymentType::fromArray(...), ['document_type' => $documentType]));
     }
 
     /**
@@ -95,7 +114,7 @@ final class Catalogs
      */
     public function costCenters(): array
     {
-        return $this->list('v1/cost-centers', CostCenter::fromArray(...));
+        return $this->remember('cost-centers', fn (): array => $this->list('v1/cost-centers', CostCenter::fromArray(...)));
     }
 
     /**
@@ -122,5 +141,20 @@ final class Catalogs
         }
 
         return $items;
+    }
+
+    /**
+     * @template TValue
+     *
+     * @param  \Closure(): TValue  $resolve
+     * @return TValue
+     */
+    private function remember(string $key, \Closure $resolve): mixed
+    {
+        if ($this->cache === null || $this->cacheKeyPrefix === null) {
+            return $resolve();
+        }
+
+        return $this->cache->remember('siigo:catalogs:'.($this->cacheKeyPrefix)().':'.$key, $resolve);
     }
 }

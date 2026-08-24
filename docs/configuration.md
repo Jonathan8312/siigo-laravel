@@ -66,14 +66,20 @@ A defense-in-depth guard: any response body larger than this raises a `RequestEx
 instead of being decoded, protecting against unbounded memory use from an unexpectedly large
 or malformed response.
 
-## Access token cache
+## Cache
 
 | Env variable | Config key | Default |
 |---|---|---|
 | `SIIGO_CACHE_STORE` | `cache.store` | `null` (application's default cache store) |
 | `SIIGO_TOKEN_SAFETY_MARGIN_SECONDS` | `cache.token_safety_margin_seconds` | `60` |
+| `SIIGO_CATALOG_CACHE_TTL_SECONDS` | `cache.catalog_ttl_seconds` | `3600` (1 hour) |
 
 Siigo's JWT is valid for 24h with no refresh endpoint, so the SDK caches it via Laravel's
 `Cache` and only re-authenticates once the cached token is within
 `token_safety_margin_seconds` of expiring — this avoids a request racing against the token
 expiring mid-flight. See [authentication.md](authentication.md).
+
+`catalog_ttl_seconds` caches `$siigo->catalogs()` results (taxes, sellers, cost centers, ...) in
+the same `store`, keyed per company — this is reference data that changes rarely, and
+re-fetching it on every invoice/payment receipt burns through Siigo's rate limit fast. Set to
+`0` to disable catalog caching and always hit the real API. See [catalogs.md](catalogs.md#caching).

@@ -13,6 +13,7 @@ use Jonathan8312\Siigo\Auth\AuthenticationManager;
 use Jonathan8312\Siigo\Auth\CacheTokenRepository;
 use Jonathan8312\Siigo\Http\Client;
 use Jonathan8312\Siigo\Http\ClientConfiguration;
+use Jonathan8312\Siigo\Support\CatalogCache;
 
 final class SiigoServiceProvider extends ServiceProvider
 {
@@ -65,7 +66,13 @@ final class SiigoServiceProvider extends ServiceProvider
 
             $client = new Client($app->make(HttpFactory::class), $auth, $clientConfiguration);
 
-            return new Siigo($client, $auth);
+            $catalogCache = new CatalogCache(
+                $app->make(CacheFactory::class),
+                $clientConfiguration->cacheStore,
+                self::toInt($cache['catalog_ttl_seconds'] ?? null, 3600),
+            );
+
+            return new Siigo($client, $auth, $catalogCache);
         });
 
         $this->app->alias(Siigo::class, 'siigo');
