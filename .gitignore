@@ -1,0 +1,9 @@
+/vendor/
+/build/
+/.phpunit.cache/
+.env
+.env.staging.local
+composer.lock
+.DS_Store
+.idea/
+.vscode/
