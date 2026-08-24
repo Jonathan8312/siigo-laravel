@@ -19,7 +19,7 @@ A community Laravel SDK for the public [Siigo API](https://developers.siigo.com/
 
 ## Status
 
-This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, and **Products** (both full CRUD). Remaining business resources (Invoices, ...) are implemented phase by phase.
+This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client), **Catalogs** (read-only reference data), **Customers**, **Products**, and **Invoices** (all full CRUD, plus DIAN/PDF/XML/email for invoices). Remaining business resources (Credit Notes, Purchases, ...) are implemented phase by phase.
 
 ## Requirements
 
@@ -61,9 +61,10 @@ public function __construct(private Siigo $siigo) {}
 $taxes = $siigo->catalogs()->taxes();
 $customer = $siigo->customers()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 $product = $siigo->products()->find('497f6eca-6276-4993-bfeb-53cbbbba6f08');
+$invoice = $siigo->invoices()->find('63f918c2-ca65-4edc-a7db-66bcdd5159fb');
 ```
 
-Remaining business resource methods (`$siigo->invoices()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
+Remaining business resource methods (`$siigo->creditNotes()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
 
 ## Documentation
 
@@ -73,6 +74,7 @@ Remaining business resource methods (`$siigo->invoices()`, ...) are added as eac
 - [Catalogs](docs/catalogs.md)
 - [Customers](docs/customers.md)
 - [Products](docs/products.md)
+- [Invoices](docs/invoices.md)
 - [Errors](docs/errors.md)
 - [Testing](docs/testing.md)
 - [Known issues](docs/known-issues.md)
