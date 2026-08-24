@@ -145,9 +145,11 @@ Query params:
 ## 6. Tipos de Comprobante (document types)
 
 - `GET https://api.siigo.com/v1/document-types`
-- Query params: `type` (string, **opcional** — no está marcado como `Required` en la tabla de
-  parámetros, a diferencia de `payment-types`). Valores documentados de ejemplo: `FV`
-  (facturas), `FC` (facturas de compra), `NC` (notas crédito), `RC` (recibos de caja).
+- Query params: `type` (string). La tabla de parámetros de la doc **no** lo marca como
+  `Required`, pero **está confirmado empíricamente que sí es obligatorio**: omitirlo devuelve
+  `400 parameter_required` en sandbox real (ver `docs/known-issues.md`). Valores documentados
+  de ejemplo: `FV` (facturas), `FC` (facturas de compra), `NC` (notas crédito), `RC` (recibos
+  de caja).
 
 Campos de respuesta (lista completa confirmada — mucho más extensa que solo id/code/name):
 
@@ -324,10 +326,11 @@ sección catalog (11 entradas totales).*
   contenido propio), pero la documentación oficial es muy escueta (no explica reglas de
   negocio más allá de una frase, y `misc-incomes` ni siquiera dice dónde se usa). No se
   encontró ninguna otra fuente oficial con más detalle.
-- **`document-types` — parámetro `type`**: la tabla de "Parámetros" en prosa dice que devuelve
-  "los tipos de comprobantes de acuerdo a los tipos de documentos contables como FV, FC, NC,
-  RC", pero no publica la lista cerrada de valores válidos (parece ser la misma lista de
-  `type` usada en otros recursos transaccionales, no confirmado exhaustivamente).
+- **`document-types` — parámetro `type`**: confirmado que es obligatorio en la práctica (ver
+  `docs/known-issues.md`), aunque la doc no lo marca como `Required`. Sigue sin confirmarse la
+  lista cerrada de valores válidos — la prosa da como ejemplo "FV, FC, NC, RC" pero no publica
+  el catálogo completo (parece ser la misma lista de `type` usada en otros recursos
+  transaccionales, no confirmado exhaustivamente).
 - **Catálogos NO confirmados oficialmente** (solo vistos en SDKs/MCPs de terceros, mencionados
   en resultados de búsqueda pero sin página oficial verificada en `developers.siigo.com`):
   - "get cities" / ciudades — visto en `glama.ai/mcp/servers/jdlar1/siigo-mcp` (MCP de

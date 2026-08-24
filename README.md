@@ -19,7 +19,7 @@ A community Laravel SDK for the public [Siigo API](https://developers.siigo.com/
 
 ## Status
 
-This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core**: bootstrap, configuration, authentication, and the HTTP client. Resource modules (Customers, Products, Invoices, ...) are implemented phase by phase.
+This package is under active, phased development (see [CLAUDE.md](CLAUDE.md) for the roadmap). The current release covers the **Core** (bootstrap, configuration, authentication, HTTP client) and **Catalogs** (read-only reference data). Business resources (Customers, Products, Invoices, ...) are implemented phase by phase.
 
 ## Requirements
 
@@ -57,15 +57,18 @@ $siigo = app(Siigo::class);
 
 // Or via dependency injection:
 public function __construct(private Siigo $siigo) {}
+
+$taxes = $siigo->catalogs()->taxes();
 ```
 
-Resource methods (`$siigo->customers()`, `$siigo->products()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
+Business resource methods (`$siigo->customers()`, `$siigo->products()`, ...) are added as each module ships — see [docs/known-issues.md](docs/known-issues.md) and [docs/research/siigo-api-co](docs/research/siigo-api-co) for what has already been investigated against the real Siigo API.
 
 ## Documentation
 
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
 - [Authentication](docs/authentication.md)
+- [Catalogs](docs/catalogs.md)
 - [Errors](docs/errors.md)
 - [Testing](docs/testing.md)
 - [Known issues](docs/known-issues.md)

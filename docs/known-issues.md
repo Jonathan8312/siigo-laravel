@@ -66,6 +66,27 @@ campo `Detail` incluye una URL a `developer.siigo.com` (dominio distinto, sin "s
 `developers.siigo.com` donde vive la documentación general) con la página específica de ese
 código de error — útil como referencia programática por `Code`.
 
+## Catálogos
+
+### `GET /v1/document-types` — `type` es en realidad obligatorio, no opcional
+La documentación oficial no marca `type` como `Required` en la tabla de parámetros de este
+endpoint. En pruebas reales contra sandbox (2026-08-23), omitirlo devuelve:
+```json
+{
+  "Status": 400,
+  "Errors": [{
+    "Code": "parameter_required",
+    "Message": "The field type is required",
+    "Params": [],
+    "Detail": null
+  }]
+}
+```
+
+**Cómo lo maneja el SDK**: `Catalogs::documentTypes(string $type)` exige el parámetro
+(no es nullable/opcional), evitando que el consumidor del SDK dispare una llamada que Siigo
+siempre va a rechazar.
+
 ## Paginación
 
 ### `page_size` del query param no siempre se refleja en la respuesta
