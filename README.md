@@ -227,6 +227,24 @@ $otherCompany->invoices()->all();
 instance with its own token and catalog cache entries, safe under Octane and other long-running
 workers. See [docs/authentication.md](docs/authentication.md).
 
+## Why not a Facade?
+
+This package doesn't ship a static `Illuminate\Support\Facades\Siigo` facade — you resolve
+`Siigo::class` from the container (or its `'siigo'` alias) directly, as shown throughout this
+README. Two reasons:
+
+1. **Immutable multi-company scoping.** `withCredentials()` returns a *new* instance rather than
+   mutating the shared singleton (see [Multi-company / SaaS usage](#multi-company--saas-usage)
+   above). A static facade makes it easy to call `Siigo::withCredentials(...)` and assume it
+   changed the app-wide instance, when really the return value is what you needed to keep.
+2. **Testability without facade mocking.** Everything goes through `Illuminate\Http\Client`, so
+   `Http::fake()` already covers testing (see
+   [Testing your own application](#testing-your-own-application)) — there's no need for
+   `Siigo::shouldReceive(...)`-style facade mocks, which would encourage mocking the SDK's own
+   methods instead of the actual HTTP boundary.
+
+Full rationale in [`docs/authentication.md`](docs/authentication.md#why-not-a-facade).
+
 ## Caching
 
 Reference catalogs (taxes, sellers, cost centers, document/payment types, ...) are per-company

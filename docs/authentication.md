@@ -54,3 +54,30 @@ safe under Octane or other long-running workers, since no shared state is ever w
   [errors.md](errors.md).
 - `Partner-Id` is not a secret, but Siigo does validate its format strictly — see
   [configuration.md](configuration.md) and [known-issues.md](known-issues.md).
+
+## Why not a Facade?
+
+`Jonathan8312\Siigo\Siigo` is registered as a container singleton with a `'siigo'` alias
+(`SiigoServiceProvider::register()`), but this package deliberately does not ship a static
+`Illuminate\Support\Facades\Siigo` facade on top of it. Two concrete reasons:
+
+1. **A facade would hide the immutability contract above.** Everything in this document works
+   because `withCredentials()` returns a *new*, detached `Siigo` instance rather than mutating
+   the shared singleton. A static facade call like `Siigo::withCredentials('other-username',
+   'other-access-key')` *looks* like a safe, self-contained statement — but the returned
+   instance would be silently discarded, and the shared singleton (and therefore every other
+   request or job sharing it under Octane) would be completely unaffected. Requiring
+   `app(Siigo::class)->withCredentials(...)` first, and forcing you to capture the result, makes
+   it obvious you're holding a new object, not mutating a global one.
+2. **Facades push testing toward the wrong boundary.** Because every resource is built on
+   `Illuminate\Http\Client`, `Http::fake()` already gives you full control over what this SDK
+   does in tests (see [`testing.md`](testing.md)) — you fake the actual network boundary, and
+   get real assertions about the requests this package sends. A static facade invites
+   `Siigo::shouldReceive('invoices')->andReturn(...)`-style mocks instead, which test that your
+   code calls the SDK a certain way rather than that it produces the right HTTP request — a
+   weaker, more brittle kind of test that also has to be rewritten every time this SDK's
+   internals change shape.
+
+None of this stops you from writing your own thin facade in your application if you prefer that
+call style for read-only, single-company use — just be aware of point 1 above if you also use
+`withCredentials()` anywhere in that same app.
